@@ -908,27 +908,60 @@ public class UserService {
      * @param request
      */
     public void batchProcessUserInfo(UserBatchProcessRequest request) {
-        List<String> userIdList = this.selectIdByUserRequest(request);
+//        List<String> userIdList = this.selectIdByUserRequest(request);
+//        String batchType = request.getBatchType();
+//        for (String userID : userIdList) {
+//            Map<String, List<String>> roleResourceIdMap = new HashMap<>();
+//            if (StringUtils.equals(BatchProcessUserInfoType.ADD_WORKSPACE.name(), batchType)) {
+//                //添加工作空间时，默认赋予只读用户权限
+//                String userRole = RoleConstants.TEST_VIEWER;
+//                List<String> workspaceID = request.getBatchProcessValue();
+//                if (workspaceID != null && !workspaceID.isEmpty()) {
+//                    roleResourceIdMap.put(userRole, workspaceID);
+//                }
+//            } else if (StringUtils.equals(BatchProcessUserInfoType.ADD_USER_ROLE.name(), batchType)) {
+//                roleResourceIdMap = this.genRoleResourceMap(request.getBatchProcessValue());
+//            }
+//            if (!roleResourceIdMap.isEmpty()) {
+//                UserRoleExample userRoleExample = new UserRoleExample();
+//                userRoleExample.createCriteria().andUserIdEqualTo(userID);
+//                List<UserRole> userRoles = userRoleMapper.selectByExample(userRoleExample);
+//                UserRequest user = this.convert2UserRequest(userID, roleResourceIdMap, userRoles);
+//                this.addUserWorkspaceAndRole(user, userRoles);
+//            }
+//        }
         String batchType = request.getBatchType();
-        for (String userID : userIdList) {
-            Map<String, List<String>> roleResourceIdMap = new HashMap<>();
-            if (StringUtils.equals(BatchProcessUserInfoType.ADD_WORKSPACE.name(), batchType)) {
-                //添加工作空间时，默认赋予只读用户权限
-                String userRole = RoleConstants.TEST_VIEWER;
-                List<String> workspaceID = request.getBatchProcessValue();
-                if (workspaceID != null && !workspaceID.isEmpty()) {
-                    roleResourceIdMap.put(userRole, workspaceID);
-                }
-            } else if (StringUtils.equals(BatchProcessUserInfoType.ADD_USER_ROLE.name(), batchType)) {
-                roleResourceIdMap = this.genRoleResourceMap(request.getBatchProcessValue());
+        if (StringUtils.equals(BatchProcessUserInfoType.ADD_PROJECT.name(), batchType)) {
+            batchAddUserToProject(request);
+        }
+    }
+
+    private void batchAddUserToProject(UserBatchProcessRequest request) {
+        List<String> userIds = this.selectIdByUserRequest(request);
+        String toSetGroup = UserGroupConstants.READ_ONLY;
+        List<String> projectIds = request.getBatchProcessValue();
+        for (String userId : userIds) {
+            UserGroupExample userGroupExample = new UserGroupExample();
+            userGroupExample
+                    .createCriteria()
+                    .andUserIdEqualTo(userId)
+                    .andGroupIdEqualTo(toSetGroup);
+            List<UserGroup> userGroups = userGroupMapper.selectByExample(userGroupExample);
+            List<String> exist = userGroups.stream().map(UserGroup::getSourceId).collect(Collectors.toList());
+            projectIds.removeAll(exist);
+            SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
+            UserGroupMapper mapper = sqlSession.getMapper(UserGroupMapper.class);
+            for (String projectId : projectIds) {
+                UserGroup userGroup = new UserGroup();
+                userGroup.setId(UUID.randomUUID().toString());
+                userGroup.setUserId(userId);
+                userGroup.setGroupId(toSetGroup);
+                userGroup.setSourceId(projectId);
+                userGroup.setCreateTime(System.currentTimeMillis());
+                userGroup.setUpdateTime(System.currentTimeMillis());
+                mapper.insertSelective(userGroup);
             }
-            if (!roleResourceIdMap.isEmpty()) {
-                UserRoleExample userRoleExample = new UserRoleExample();
-                userRoleExample.createCriteria().andUserIdEqualTo(userID);
-                List<UserRole> userRoles = userRoleMapper.selectByExample(userRoleExample);
-                UserRequest user = this.convert2UserRequest(userID, roleResourceIdMap, userRoles);
-                this.addUserWorkspaceAndRole(user, userRoles);
-            }
+            sqlSession.flushStatements();
         }
     }
 
