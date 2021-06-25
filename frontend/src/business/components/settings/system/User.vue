@@ -99,6 +99,7 @@
     </el-dialog>
     <user-import ref="userImportDialog" @refreshAll="search"></user-import>
     <project-cascader :title="batchAddTitle" @confirm="cascaderConfirm" ref="cascaderDialog"></project-cascader>
+    <group-cascader :title="'批量添加用户组'" @confirm="cascaderConfirm" ref="groupCascaderDialog"></group-cascader>
     <edit-user ref="editUser" @refresh="search"/>
   </div>
 </template>
@@ -127,10 +128,12 @@ import UserCascader from "@/business/components/settings/system/components/UserC
 import ShowMoreBtn from "@/business/components/track/case/components/ShowMoreBtn";
 import EditUser from "@/business/components/settings/system/EditUser";
 import ProjectCascader from "@/business/components/settings/system/components/ProjectCascader";
+import GroupCascader from "@/business/components/settings/system/components/GroupCascader";
 
 export default {
   name: "MsUser",
   components: {
+    GroupCascader,
     EditUser,
     MsCreateBox,
     MsTablePagination,
@@ -195,9 +198,9 @@ export default {
         {
           name: "批量添加到项目", handleClick: this.addToProjectBatch
         },
-        // {
-        //   name: this.$t('user.button.add_user_role_batch'), handleClick: this.addUserRoleBatch
-        // }
+        {
+          name: "批量添加用户组", handleClick: this.addUserGroupBatch
+        }
       ],
       rule: {
         id: [
@@ -419,22 +422,6 @@ export default {
     importUserDialogOpen(){
       this.$refs.userImportDialog.open();
     },
-    initProjectBatchProcessDataStruct(isShow){
-      this.$get("/user/getWorkspaceDataStruct/All", response => {
-        this.batchAddProjectOptions = response.data;
-        if(isShow){
-          this.$refs.cascaderDialog.open('ADD_PROJECT',this.batchAddProjectOptions);
-        }
-      });
-    },
-    initRoleBatchProcessDataStruct(isShow){
-      this.$get("/user/getUserRoleDataStruct/All", response => {
-        this.batchAddUserRoleOptions = response.data;
-        if(isShow){
-          this.$refs.cascaderDialog.open('ADD_USER_ROLE',this.batchAddUserRoleOptions);
-        }
-      });
-    },
     handleSelectAll(selection) {
       _handleSelectAll(this, selection, this.tableData, this.selectRows, this.condition);
       setUnSelectIds(this.tableData, this.condition, this.selectRows);
@@ -455,20 +442,12 @@ export default {
       toggleAllSelection(this.$refs.userTable, this.tableData, this.selectRows);
     },
     addToProjectBatch(){
-      if(this.batchAddProjectOptions.length === 0){
-        this.initProjectBatchProcessDataStruct(true);
-      }else{
-        this.$refs.cascaderDialog.open('ADD_PROJECT',this.batchAddProjectOptions);
-      }
+      this.$refs.cascaderDialog.open('ADD_PROJECT',this.batchAddProjectOptions);
     },
-    addUserRoleBatch(){
-      if(this.batchAddUserRoleOptions.length === 0){
-        this.initRoleBatchProcessDataStruct(true);
-      }else{
-        this.$refs.cascaderDialog.open('ADD_USER_ROLE',this.batchAddUserRoleOptions);
-      }
+    addUserGroupBatch(){
+      this.$refs.groupCascaderDialog.open('ADD_USER_GROUP',this.batchAddUserRoleOptions);
     },
-    cascaderConfirm(batchProcessTypeParam,selectValueArr){
+    cascaderConfirm(batchProcessTypeParam, selectValueArr){
       if(selectValueArr.length === 0){
         this.$success(this.$t('commons.modify_success'));
       }
@@ -479,7 +458,8 @@ export default {
       this.$post('/user/special/batchProcessUserInfo', params, () => {
         this.$success(this.$t('commons.modify_success'));
         this.search();
-        this.$refs.cascaderDialog.close();
+        batchProcessTypeParam === "ADD_PROJECT" ? this.$refs.cascaderDialog.close() :
+          this.$refs.groupCascaderDialog.close();
       });
     },
     buildBatchParam(param) {
